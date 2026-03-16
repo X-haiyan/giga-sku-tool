@@ -120,9 +120,30 @@ tbody tr:last-child td { border-bottom: none; }
 .badge-warn { background: var(--warning-bg); color: var(--warning-text); }
 .tag { display: inline-block; background: var(--red-bg); color: var(--red-text); font-size: 11px; padding: 1px 7px; border-radius: 8px; margin: 1px 2px; }
 .hidden { display: none; }
+.lock-screen { position: fixed; inset: 0; background: var(--bg); display: flex; align-items: center; justify-content: center; z-index: 999; }
+.lock-card { background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 2rem; width: 100%; max-width: 360px; text-align: center; }
+.lock-title { font-size: 18px; font-weight: 500; margin-bottom: 0.25rem; }
+.lock-sub { font-size: 13px; color: var(--text-secondary); margin-bottom: 1.5rem; }
+.lock-input { width: 100%; padding: 10px 12px; font-size: 15px; border: 0.5px solid var(--border-md); border-radius: var(--radius-sm); background: var(--bg); color: var(--text); margin-bottom: 10px; text-align: center; letter-spacing: 0.1em; font-family: inherit; }
+.lock-input:focus { outline: none; border-color: var(--blue); }
+.lock-btn { width: 100%; padding: 11px; font-size: 15px; font-weight: 500; border: 0.5px solid var(--border-md); border-radius: var(--radius-sm); cursor: pointer; background: var(--surface); color: var(--text); font-family: inherit; transition: all 0.15s; }
+.lock-btn:hover { background: var(--blue-bg); color: var(--blue-text); border-color: var(--blue); }
+.lock-err { font-size: 13px; color: var(--red); margin-top: 8px; min-height: 18px; }
 </style>
 </head>
 <body>
+
+<div class="lock-screen" id="lockScreen">
+  <div class="lock-card">
+    <div class="lock-title">GIGA SKU Query Tool</div>
+    <div class="lock-sub">请输入访问密码</div>
+    <input class="lock-input" type="password" id="lockInput" placeholder="••••••••" onkeydown="if(event.key==='Enter')unlock()">
+    <button class="lock-btn" onclick="unlock()">进入</button>
+    <div class="lock-err" id="lockErr"></div>
+  </div>
+</div>
+
+<div id="mainApp" class="hidden">
 <div class="container">
   <h1>GIGA B2B — SKU Query Tool</h1>
   <p class="subtitle">Batch-query product details (comboInfo, unAvailablePlatform, dimensions) via GIGA OpenAPI 2.0</p>
@@ -203,8 +224,30 @@ tbody tr:last-child td { border-bottom: none; }
     <div class="preview-wrap" id="previewWrap"></div>
   </div>
 </div>
+</div>
 
 <script>
+const PWD_HASH = 'e2d3c2a1f8b7e6d5c4b3a2f1e0d9c8b7a6f5e4d3c2b1a0f9e8d7c6b5a4f3e2d1';
+
+async function sha256(str) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+async function unlock() {
+  const val = document.getElementById('lockInput').value;
+  const hash = await sha256(val);
+  const correct = await sha256('GTH@GIGA@951');
+  if (hash === correct) {
+    document.getElementById('lockScreen').style.display = 'none';
+    document.getElementById('mainApp').classList.remove('hidden');
+  } else {
+    document.getElementById('lockErr').textContent = '密码错误，请重试';
+    document.getElementById('lockInput').value = '';
+    document.getElementById('lockInput').focus();
+  }
+}
+
 let skuList = [];
 let results = [];
 let stopped = false;
