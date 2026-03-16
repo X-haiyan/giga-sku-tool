@@ -133,9 +133,7 @@ tbody tr:last-child td { border-bottom: none; }
       <label>Authorization</label>
       <input type="password" id="authorization" placeholder="粘贴你的 Authorization token" autocomplete="off" style="width:100%">
     </div>
-    <div id="proxyStatus" style="font-size:12px; padding:8px 12px; border-radius:6px; background:var(--warning-bg); color:var(--warning-text);">
-      正在检测本地代理…
-    </div>
+
   </div>
 
   <div class="section">
@@ -206,24 +204,7 @@ let skuList = [];
 let results = [];
 let stopped = false;
 
-const PROXY = 'http://localhost:3099';
-const API_PATH = '/b2b-overseas-api/v1/buyer/product/detailInfo/v1';
-
-async function checkProxy() {
-  const el = document.getElementById('proxyStatus');
-  try {
-    await fetch(`${PROXY}/health`);
-    el.style.background = 'var(--success-bg)';
-    el.style.color = 'var(--success-text)';
-    el.textContent = '✅ 代理已连接，可以开始查询';
-  } catch(e) {
-    el.style.background = 'var(--red-bg)';
-    el.style.color = 'var(--red-text)';
-    el.textContent = '❌ 未检测到代理 — 请双击「启动工具.bat」再打开此页面';
-  }
-}
-checkProxy();
-setInterval(checkProxy, 5000);
+const API_URL = 'https://openapi.gigab2b.com/b2b-overseas-api/v1/buyer/product/detailInfo/v1';
 
 const dropZone = document.getElementById('dropZone');
 dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.style.borderColor = 'var(--blue)'; });
@@ -281,7 +262,7 @@ function addLog(msg, type = '') {
 
 async function queryBatch(skus) {
   const authorization = document.getElementById('authorization').value.trim();
-  const resp = await fetch(`${PROXY}${API_PATH}`, {
+  const resp = await fetch(API_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
