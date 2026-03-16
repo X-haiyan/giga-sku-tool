@@ -129,11 +129,16 @@ tbody tr:last-child td { border-bottom: none; }
 
   <div class="section">
     <div class="section-title">API 配置</div>
-    <div class="field" style="margin-bottom:12px">
-      <label>Authorization</label>
-      <input type="password" id="authorization" placeholder="粘贴你的 Authorization token" autocomplete="off" style="width:100%">
+    <div class="row">
+      <div class="field">
+        <label>Client ID</label>
+        <input type="text" id="clientId" placeholder="你的 Client ID" autocomplete="off">
+      </div>
+      <div class="field">
+        <label>Client Secret</label>
+        <input type="password" id="clientSecret" placeholder="你的 Client Secret" autocomplete="off">
+      </div>
     </div>
-
   </div>
 
   <div class="section">
@@ -205,6 +210,29 @@ let results = [];
 let stopped = false;
 
 const API_URL = 'https://giga.chinaxinghaiyan.workers.dev/';
+const API_PATH = '/b2b-overseas-api/v1/buyer/product/detailInfo/v1';
+
+function generateNonce(len = 10) {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  return Array.from({ length: len }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+}
+
+async function hmacSHA256hex(message, key) {
+  const enc = new TextEncoder();
+  const cryptoKey = await crypto.subtle.importKey('raw', enc.encode(key), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const sig = await crypto.subtle.sign('HMAC', cryptoKey, enc.encode(message));
+  return Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function getSign(clientId, clientSecret) {
+  const nonce = generateNonce(10);
+  const timestamp = Date.now();
+  const msg = `${clientId}&${API_PATH}&${timestamp}&${nonce}`;
+  const key = `${clientId}&${clientSecret}&${nonce}`;
+  const hex = await hmacSHA256hex(msg, key);
+  const sign = btoa(hex);
+  return { nonce, timestamp: String(timestamp), sign };
+}
 
 const dropZone = document.getElementById('dropZone');
 dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.style.borderColor = 'var(--blue)'; });
@@ -244,10 +272,13 @@ function handleFile(file) {
 }
 
 function checkReady() {
-  const ok = skuList.length > 0 && document.getElementById('authorization').value.trim();
+  const ok = skuList.length > 0
+    && document.getElementById('clientId').value.trim()
+    && document.getElementById('clientSecret').value.trim();
   document.getElementById('startBtn').disabled = !ok;
 }
-document.getElementById('authorization').addEventListener('input', checkReady);
+document.getElementById('clientId').addEventListener('input', checkReady);
+document.getElementById('clientSecret').addEventListener('input', checkReady);
 
 
 function addLog(msg, type = '') {
@@ -261,12 +292,17 @@ function addLog(msg, type = '') {
 }
 
 async function queryBatch(skus) {
-  const authorization = document.getElementById('authorization').value.trim();
+  const clientId = document.getElementById('clientId').value.trim();
+  const clientSecret = document.getElementById('clientSecret').value.trim();
+  const { nonce, timestamp, sign } = await getSign(clientId, clientSecret);
   const resp = await fetch(API_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': authorization
+      'client-id': clientId,
+      'timestamp': timestamp,
+      'nonce': nonce,
+      'sign': sign
     },
     body: JSON.stringify({ skus })
   });
