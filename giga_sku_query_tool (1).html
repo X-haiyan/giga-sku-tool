@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GIGA B2B — SKU Query Tool</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #f5f4f1;
+  --surface: #ffffff;
+  --border: rgba(0,0,0,0.12);
+  --border-md: rgba(0,0,0,0.22);
+  --text: #1a1a18;
+  --text-secondary: #6b6b67;
+  --text-tertiary: #9a9a96;
+  --blue: #185FA5;
+  --blue-bg: #E6F1FB;
+  --blue-text: #0C447C;
+  --green: #3B6D11;
+  --green-bg: #EAF3DE;
+  --green-text: #27500A;
+  --red: #A32D2D;
+  --red-bg: #FCEBEB;
+  --red-text: #791F1F;
+  --amber-bg: #FAEEDA;
+  --amber-text: #854F0B;
+  --success-bg: #EAF3DE;
+  --success-text: #27500A;
+  --warning-bg: #FAEEDA;
+  --warning-text: #854F0B;
+  --radius: 10px;
+  --radius-sm: 6px;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1a1a18;
+    --surface: #242422;
+    --border: rgba(255,255,255,0.1);
+    --border-md: rgba(255,255,255,0.18);
+    --text: #f0efe8;
+    --text-secondary: #a0a09a;
+    --text-tertiary: #6b6b67;
+    --blue: #85B7EB;
+    --blue-bg: #0c2a44;
+    --blue-text: #B5D4F4;
+    --green-bg: #172804;
+    --green-text: #C0DD97;
+    --red-bg: #3a1010;
+    --red-text: #F7C1C1;
+    --amber-bg: #2a1a04;
+    --amber-text: #FAC775;
+    --success-bg: #172804;
+    --success-text: #C0DD97;
+    --warning-bg: #2a1a04;
+    --warning-text: #FAC775;
+  }
+}
+body { font-family: -apple-system, 'Helvetica Neue', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; padding: 2rem 1rem; }
+.container { max-width: 860px; margin: 0 auto; }
+h1 { font-size: 22px; font-weight: 500; margin-bottom: 0.25rem; }
+.subtitle { font-size: 14px; color: var(--text-secondary); margin-bottom: 2rem; }
+.section { background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 1.25rem; margin-bottom: 1rem; }
+.section-title { font-size: 11px; font-weight: 500; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 1rem; }
+.row { display: flex; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+.field { flex: 1; min-width: 200px; }
+.field label { display: block; font-size: 13px; color: var(--text-secondary); margin-bottom: 5px; }
+.field input[type=text], .field input[type=password], .field input[type=number] {
+  width: 100%; padding: 8px 10px; font-size: 14px;
+  border: 0.5px solid var(--border-md); border-radius: var(--radius-sm);
+  background: var(--bg); color: var(--text); font-family: 'Courier New', monospace;
+  transition: border-color 0.15s;
+}
+.field input:focus { outline: none; border-color: var(--blue); }
+.env-toggle { display: flex; gap: 8px; }
+.env-btn { flex: 1; padding: 8px; font-size: 13px; border: 0.5px solid var(--border-md); border-radius: var(--radius-sm); cursor: pointer; background: var(--bg); color: var(--text-secondary); transition: all 0.15s; font-family: inherit; }
+.env-btn:hover { background: var(--surface); }
+.env-btn.active { background: var(--blue-bg); color: var(--blue-text); border-color: var(--blue); font-weight: 500; }
+.upload-zone { border: 1.5px dashed var(--border-md); border-radius: var(--radius); padding: 2.5rem 2rem; text-align: center; cursor: pointer; transition: all 0.15s; }
+.upload-zone:hover { border-color: var(--blue); background: var(--blue-bg); }
+.upload-zone.has-file { border-style: solid; border-color: var(--green); background: var(--success-bg); }
+.upload-icon { font-size: 32px; margin-bottom: 10px; line-height: 1; }
+.upload-label { font-size: 14px; color: var(--text-secondary); }
+.upload-label strong { color: var(--text); }
+.file-hint { font-size: 12px; color: var(--text-tertiary); margin-top: 6px; }
+#file-input { display: none; }
+.col-row { display: flex; gap: 20px; margin-top: 14px; flex-wrap: wrap; }
+.col-row .field { flex: 0 0 auto; min-width: 0; }
+.col-row input[type=text], .col-row input[type=number] { width: 90px; }
+.col-row .field label { white-space: nowrap; }
+.sku-preview { margin-top: 10px; font-size: 13px; color: var(--text-secondary); font-family: 'Courier New', monospace; }
+.start-btn { width: 100%; padding: 13px; font-size: 15px; font-weight: 500; border: 0.5px solid var(--border-md); border-radius: var(--radius); cursor: pointer; background: var(--surface); color: var(--text); transition: all 0.15s; font-family: inherit; }
+.start-btn:hover:not(:disabled) { background: var(--bg); border-color: var(--blue); color: var(--blue); }
+.start-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.stop-btn { width: 100%; padding: 13px; font-size: 15px; font-weight: 500; border: 0.5px solid var(--red); border-radius: var(--radius); cursor: pointer; background: var(--red-bg); color: var(--red-text); margin-top: 8px; font-family: inherit; transition: opacity 0.15s; }
+.stop-btn:hover { opacity: 0.8; }
+.progress-bar-wrap { background: var(--bg); border-radius: 6px; height: 8px; overflow: hidden; margin: 12px 0 6px; }
+.progress-bar { height: 100%; background: var(--blue); border-radius: 6px; transition: width 0.4s ease; }
+.progress-label { font-size: 13px; color: var(--text-secondary); }
+.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 14px; }
+@media (max-width: 500px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+.stat { background: var(--bg); border-radius: var(--radius-sm); padding: 10px 14px; }
+.stat-label { font-size: 11px; color: var(--text-tertiary); margin-bottom: 4px; }
+.stat-val { font-size: 22px; font-weight: 500; }
+.log { background: var(--bg); border-radius: var(--radius-sm); padding: 10px 14px; font-family: 'Courier New', monospace; font-size: 12px; color: var(--text-secondary); max-height: 180px; overflow-y: auto; margin-top: 12px; line-height: 1.6; }
+.log-err { color: var(--red); }
+.log-ok { color: var(--green); }
+.results-actions { display: flex; gap: 8px; margin-top: 12px; }
+.dl-btn { flex: 1; padding: 9px; font-size: 13px; border: 0.5px solid var(--border-md); border-radius: var(--radius-sm); cursor: pointer; background: var(--surface); color: var(--text); font-family: inherit; transition: all 0.15s; }
+.dl-btn:hover { background: var(--blue-bg); color: var(--blue-text); border-color: var(--blue); }
+.results-count { font-size: 13px; color: var(--text-secondary); margin-bottom: 4px; }
+.preview-wrap { overflow-x: auto; margin-top: 12px; max-height: 300px; overflow-y: auto; border: 0.5px solid var(--border); border-radius: var(--radius-sm); }
+table { width: 100%; font-size: 12px; border-collapse: collapse; }
+thead th { padding: 7px 10px; text-align: left; font-weight: 500; font-size: 11px; color: var(--text-secondary); background: var(--bg); border-bottom: 0.5px solid var(--border); position: sticky; top: 0; white-space: nowrap; }
+tbody td { padding: 6px 10px; border-bottom: 0.5px solid var(--border); white-space: nowrap; color: var(--text); }
+tbody tr:last-child td { border-bottom: none; }
+.badge { display: inline-block; padding: 2px 7px; border-radius: 9px; font-size: 11px; font-weight: 500; }
+.badge-ok { background: var(--success-bg); color: var(--success-text); }
+.badge-warn { background: var(--warning-bg); color: var(--warning-text); }
+.tag { display: inline-block; background: var(--red-bg); color: var(--red-text); font-size: 11px; padding: 1px 7px; border-radius: 8px; margin: 1px 2px; }
+.hidden { display: none; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>GIGA B2B — SKU Query Tool</h1>
+  <p class="subtitle">Batch-query product details (comboInfo, unAvailablePlatform, dimensions) via GIGA OpenAPI 2.0</p>
+
+  <div class="section">
+    <div class="section-title">API 配置</div>
+    <div class="field" style="margin-bottom:12px">
+      <label>Authorization</label>
+      <input type="password" id="authorization" placeholder="粘贴你的 Authorization token" autocomplete="off" style="width:100%">
+    </div>
+    <div id="proxyStatus" style="font-size:12px; padding:8px 12px; border-radius:6px; background:var(--warning-bg); color:var(--warning-text);">
+      正在检测本地代理…
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Upload SKU list (Excel)</div>
+    <div class="upload-zone" id="dropZone" onclick="document.getElementById('file-input').click()">
+      <div class="upload-icon">📄</div>
+      <div class="upload-label" id="uploadLabel"><strong>Click to upload</strong> or drag &amp; drop</div>
+      <div class="file-hint">Excel file (.xlsx / .xls) — first sheet, SKUs in one column</div>
+    </div>
+    <input type="file" id="file-input" accept=".xlsx,.xls" onchange="handleFile(this.files[0])">
+    <div class="col-row">
+      <div class="field">
+        <label>Column with SKUs</label>
+        <input type="text" id="skuCol" value="A" maxlength="3" placeholder="A">
+      </div>
+      <div class="field">
+        <label>Header rows to skip</label>
+        <input type="number" id="skipRows" value="1" min="0" max="20">
+      </div>
+    </div>
+    <div class="sku-preview" id="skuPreview"></div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Query settings</div>
+    <div class="row">
+      <div class="field" style="flex: 0 0 auto; min-width:0">
+        <label>Batch size (max 200)</label>
+        <input type="number" id="batchSize" value="200" min="1" max="200" style="width:100px">
+      </div>
+      <div class="field" style="flex: 0 0 auto; min-width:0">
+        <label>Delay between batches (ms)</label>
+        <input type="number" id="batchDelay" value="600" min="100" max="10000" style="width:130px">
+      </div>
+    </div>
+    <button class="start-btn" id="startBtn" onclick="startQuery()" disabled>Start querying</button>
+    <div id="stopWrap" class="hidden">
+      <button class="stop-btn" onclick="stopQuery()">Stop</button>
+    </div>
+  </div>
+
+  <div class="section hidden" id="progressSection">
+    <div class="section-title">Progress</div>
+    <div class="progress-label" id="progressLabel"></div>
+    <div class="progress-bar-wrap"><div class="progress-bar" id="progressBar" style="width:0%"></div></div>
+    <div class="stats">
+      <div class="stat"><div class="stat-label">Total SKUs</div><div class="stat-val" id="statTotal">0</div></div>
+      <div class="stat"><div class="stat-label">Queried</div><div class="stat-val" id="statQueried">0</div></div>
+      <div class="stat"><div class="stat-label">Found</div><div class="stat-val" id="statFound">0</div></div>
+      <div class="stat"><div class="stat-label">Errors</div><div class="stat-val" id="statErrors">0</div></div>
+    </div>
+    <div class="log" id="log"></div>
+  </div>
+
+  <div class="section hidden" id="resultsSection">
+    <div class="section-title">Results</div>
+    <div class="results-count" id="resultsCount"></div>
+    <div class="results-actions">
+      <button class="dl-btn" onclick="downloadCSV()">⬇ Download CSV</button>
+      <button class="dl-btn" onclick="downloadXLSX()">⬇ Download Excel (.xlsx)</button>
+    </div>
+    <div class="preview-wrap" id="previewWrap"></div>
+  </div>
+</div>
+
+<script>
+let skuList = [];
+let results = [];
+let stopped = false;
+
+const PROXY = 'http://localhost:3099';
+const API_PATH = '/b2b-overseas-api/v1/buyer/product/detailInfo/v1';
+
+async function checkProxy() {
+  const el = document.getElementById('proxyStatus');
+  try {
+    await fetch(`${PROXY}/health`);
+    el.style.background = 'var(--success-bg)';
+    el.style.color = 'var(--success-text)';
+    el.textContent = '✅ 代理已连接，可以开始查询';
+  } catch(e) {
+    el.style.background = 'var(--red-bg)';
+    el.style.color = 'var(--red-text)';
+    el.textContent = '❌ 未检测到代理 — 请双击「启动工具.bat」再打开此页面';
+  }
+}
+checkProxy();
+setInterval(checkProxy, 5000);
+
+const dropZone = document.getElementById('dropZone');
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.style.borderColor = 'var(--blue)'; });
+dropZone.addEventListener('dragleave', () => { dropZone.style.borderColor = ''; });
+dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.style.borderColor = ''; handleFile(e.dataTransfer.files[0]); });
+
+function handleFile(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const wb = XLSX.read(e.target.result, { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const colLetter = (document.getElementById('skuCol').value || 'A').toUpperCase();
+      const skip = parseInt(document.getElementById('skipRows').value) || 1;
+      const range = XLSX.utils.decode_range(ws['!ref'] || 'A1:A1');
+      const colIdx = XLSX.utils.decode_col(colLetter);
+      const skus = [];
+      for (let r = range.s.r + skip; r <= range.e.r; r++) {
+        const cell = ws[XLSX.utils.encode_cell({ r, c: colIdx })];
+        if (cell && cell.v !== undefined && String(cell.v).trim()) {
+          skus.push(String(cell.v).trim());
+        }
+      }
+      skuList = [...new Set(skus)];
+      document.getElementById('uploadLabel').innerHTML = `<strong>${file.name}</strong> — ${skuList.length.toLocaleString()} SKUs loaded`;
+      document.getElementById('skuPreview').textContent = skuList.length > 0
+        ? 'Preview: ' + skuList.slice(0,6).join(', ') + (skuList.length > 6 ? '...' : '')
+        : 'No SKUs found in that column.';
+      dropZone.classList.add('has-file');
+      checkReady();
+    } catch(err) {
+      alert('Error reading file: ' + err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function checkReady() {
+  const ok = skuList.length > 0 && document.getElementById('authorization').value.trim();
+  document.getElementById('startBtn').disabled = !ok;
+}
+document.getElementById('authorization').addEventListener('input', checkReady);
+
+
+function addLog(msg, type = '') {
+  const log = document.getElementById('log');
+  const line = document.createElement('div');
+  if (type === 'err') line.className = 'log-err';
+  if (type === 'ok') line.className = 'log-ok';
+  line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+  log.appendChild(line);
+  log.scrollTop = log.scrollHeight;
+}
+
+async function queryBatch(skus) {
+  const authorization = document.getElementById('authorization').value.trim();
+  const resp = await fetch(`${PROXY}${API_PATH}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': authorization
+    },
+    body: JSON.stringify({ skus })
+  });
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  return await resp.json();
+}
+
+function processItem(item) {
+  const rows = [];
+  const sku = item.sku || '';
+  const unavail = (item.unAvailablePlatform || []).map(p => p.name || p.id || '').filter(Boolean).join(', ');
+  const skuAvailable = item.skuAvailable !== undefined ? String(item.skuAvailable) : '';
+  const isCombo = item.comboFlag || (item.weight === null && item.length === null && item.comboInfo && item.comboInfo.length > 0);
+
+  if (!isCombo || !item.comboInfo || item.comboInfo.length === 0) {
+    rows.push({
+      sku, type: isCombo ? 'combo' : 'single', packageSku: sku,
+      weight: item.weight ?? '', length: item.length ?? '', width: item.width ?? '', height: item.height ?? '',
+      weightKg: item.weightKg ?? '', lengthCm: item.lengthCm ?? '', widthCm: item.widthCm ?? '', heightCm: item.heightCm ?? '',
+      qty: 1, skuAvailable, unAvailablePlatform: unavail
+    });
+  } else {
+    for (const ci of (item.comboInfo || [])) {
+      const qty = ci.qty || 1;
+      for (let q = 0; q < qty; q++) {
+        rows.push({
+          sku, type: 'combo', packageSku: ci.sku || '',
+          weight: ci.weight ?? '', length: ci.length ?? '', width: ci.width ?? '', height: ci.height ?? '',
+          weightKg: ci.weightKg ?? '', lengthCm: ci.lengthCm ?? '', widthCm: ci.widthCm ?? '', heightCm: ci.heightCm ?? '',
+          qty, skuAvailable, unAvailablePlatform: unavail
+        });
+      }
+    }
+  }
+  return rows;
+}
+
+const HEADERS = ['SKU','Type','Package SKU','Weight (lb)','Length (in)','Width (in)','Height (in)','Weight (kg)','Length (cm)','Width (cm)','Height (cm)','Qty','SKU Available','Unavailable Platforms'];
+const KEYS = ['sku','type','packageSku','weight','length','width','height','weightKg','lengthCm','widthCm','heightCm','qty','skuAvailable','unAvailablePlatform'];
+
+function renderPreview() {
+  const wrap = document.getElementById('previewWrap');
+  if (results.length === 0) { wrap.innerHTML = ''; return; }
+  const preview = results.slice(0, 60);
+  let html = '<table><thead><tr>' + HEADERS.map(h => `<th>${h}</th>`).join('') + '</tr></thead><tbody>';
+  for (const row of preview) {
+    html += '<tr>' + KEYS.map(k => {
+      const v = row[k] ?? '';
+      if (k === 'type') return `<td><span class="badge ${v==='combo'?'badge-warn':'badge-ok'}">${v}</span></td>`;
+      if (k === 'unAvailablePlatform' && v) return `<td>${v.split(',').map(p => `<span class="tag">${p.trim()}</span>`).join('')}</td>`;
+      return `<td>${v}</td>`;
+    }).join('') + '</tr>';
+  }
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+  const uniqueSkus = new Set(results.map(r => r.sku)).size;
+  document.getElementById('resultsCount').textContent = `${results.length.toLocaleString()} rows total (showing first 60) — ${uniqueSkus.toLocaleString()} unique source SKUs`;
+}
+
+function toCSVRows() {
+  const escape = v => { const s = String(v ?? ''); return (s.includes(',') || s.includes('"') || s.includes('\n')) ? `"${s.replace(/"/g,'""')}"` : s; };
+  return [HEADERS.join(','), ...results.map(r => KEYS.map(k => escape(r[k])).join(','))].join('\n');
+}
+
+function downloadCSV() {
+  const blob = new Blob(['\uFEFF' + toCSVRows()], { type: 'text/csv;charset=utf-8;' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'giga_sku_details.csv'; a.click();
+}
+
+function downloadXLSX() {
+  const wsData = [HEADERS, ...results.map(r => KEYS.map(k => r[k] ?? ''))];
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'SKU Details');
+  XLSX.writeFile(wb, 'giga_sku_details.xlsx');
+}
+
+async function startQuery() {
+  stopped = false;
+  results = [];
+  const skus = [...skuList];
+  const batchSize = Math.min(parseInt(document.getElementById('batchSize').value) || 200, 200);
+  const delay = parseInt(document.getElementById('batchDelay').value) || 600;
+  const total = skus.length;
+
+  document.getElementById('progressSection').classList.remove('hidden');
+  document.getElementById('resultsSection').classList.remove('hidden');
+  document.getElementById('startBtn').disabled = true;
+  document.getElementById('stopWrap').classList.remove('hidden');
+  document.getElementById('statTotal').textContent = total.toLocaleString();
+  document.getElementById('log').innerHTML = '';
+
+  let queried = 0, found = 0, errors = 0;
+  const batches = [];
+  for (let i = 0; i < skus.length; i += batchSize) batches.push(skus.slice(i, i + batchSize));
+
+  addLog(`Starting: ${total.toLocaleString()} SKUs in ${batches.length} batches of ${batchSize}`);
+
+  for (let bi = 0; bi < batches.length; bi++) {
+    if (stopped) { addLog('Stopped by user.', 'err'); break; }
+    const batch = batches[bi];
+    try {
+      addLog(`Batch ${bi+1}/${batches.length} (${batch.length} SKUs)…`);
+      const res = await queryBatch(batch);
+      if (res.success && Array.isArray(res.data)) {
+        for (const item of res.data) { results.push(...processItem(item)); found++; }
+        addLog(`Batch ${bi+1} OK — ${res.data.length} products`, 'ok');
+      } else {
+        errors++;
+        addLog(`Batch ${bi+1} error: ${res.msg || res.code}`, 'err');
+      }
+    } catch(e) {
+      errors++;
+      addLog(`Batch ${bi+1} fetch error: ${e.message}`, 'err');
+    }
+    queried += batch.length;
+    const pct = Math.round((queried / total) * 100);
+    document.getElementById('progressBar').style.width = pct + '%';
+    document.getElementById('progressLabel').textContent = `${queried.toLocaleString()} / ${total.toLocaleString()} SKUs queried (${pct}%)`;
+    document.getElementById('statQueried').textContent = queried.toLocaleString();
+    document.getElementById('statFound').textContent = found.toLocaleString();
+    document.getElementById('statErrors').textContent = errors;
+    renderPreview();
+    if (bi < batches.length - 1 && !stopped) await new Promise(r => setTimeout(r, delay));
+  }
+
+  document.getElementById('startBtn').disabled = false;
+  document.getElementById('stopWrap').classList.add('hidden');
+  if (!stopped) addLog(`Done! ${results.length.toLocaleString()} rows from ${found.toLocaleString()} products.`, 'ok');
+  renderPreview();
+}
+
+function stopQuery() { stopped = true; }
+</script>
+</body>
+</html>
